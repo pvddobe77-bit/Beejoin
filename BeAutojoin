@@ -60,7 +60,7 @@ end)
 
 -- Aba Auto Joiner
 local autoJoinerFrame = Instance.new("Frame")
-autoJoinerFrame.Size = UDim2.new(0,160,0,100)
+autoJoinerFrame.Size = UDim2.new(0,240,0,100) -- maior para dois botões
 autoJoinerFrame.Position = UDim2.new(0,20,0,100)
 autoJoinerFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
 autoJoinerFrame.Visible = false
@@ -72,7 +72,7 @@ frameCorner.Parent = autoJoinerFrame
 
 -- Texto de status
 local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(0,140,0,20)
+statusLabel.Size = UDim2.new(0,220,0,20)
 statusLabel.Position = UDim2.new(0,10,0,60)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(0,255,0)
@@ -81,73 +81,111 @@ statusLabel.Font = Enum.Font.GothamBold
 statusLabel.TextSize = 12
 statusLabel.Parent = autoJoinerFrame
 
--- Botão Auto Joiner
-local autoJoinerBtn = Instance.new("TextButton")
-autoJoinerBtn.Size = UDim2.new(0,140,0,40)
-autoJoinerBtn.Position = UDim2.new(0,10,0,20)
-autoJoinerBtn.Text = "Auto Joiner"
-autoJoinerBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-autoJoinerBtn.TextColor3 = Color3.new(1,1,1)
-autoJoinerBtn.Parent = autoJoinerFrame
+-- Botão Auto Join God (ANTES era Secret)
+local autoJoinerGodBtn = Instance.new("TextButton")
+autoJoinerGodBtn.Size = UDim2.new(0,100,0,30)
+autoJoinerGodBtn.Position = UDim2.new(0,10,0,20)
+autoJoinerGodBtn.Text = "Auto Join God"
+autoJoinerGodBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
+autoJoinerGodBtn.TextColor3 = Color3.new(1,1,1)
+autoJoinerGodBtn.Parent = autoJoinerFrame
 
-local btnCorner = Instance.new("UICorner")
-btnCorner.CornerRadius = UDim.new(0,8)
-btnCorner.Parent = autoJoinerBtn
+local btnCorner1 = Instance.new("UICorner")
+btnCorner1.CornerRadius = UDim.new(0,6)
+btnCorner1.Parent = autoJoinerGodBtn
+
+-- Botão Auto Join Secret (ANTES era God)
+local autoJoinerSecretBtn = Instance.new("TextButton")
+autoJoinerSecretBtn.Size = UDim2.new(0,100,0,30)
+autoJoinerSecretBtn.Position = UDim2.new(0,130,0,20)
+autoJoinerSecretBtn.Text = "Auto Join Secret"
+autoJoinerSecretBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
+autoJoinerSecretBtn.TextColor3 = Color3.new(1,1,1)
+autoJoinerSecretBtn.Parent = autoJoinerFrame
+
+local btnCorner2 = Instance.new("UICorner")
+btnCorner2.CornerRadius = UDim.new(0,6)
+btnCorner2.Parent = autoJoinerSecretBtn
 
 -- Toggle da aba
 botaoMenu.MouseButton1Click:Connect(function()
     autoJoinerFrame.Visible = not autoJoinerFrame.Visible
 end)
 
--- Loop contínuo do Auto Joiner com toggle e status atualizado
-local autoJoinerActive = false
+-- Função genérica de Auto Join
+local function startAutoJoin(btn, label, searchName)
+    local active = false
+    local maxAttempts = 15
+    local attemptCount = 0
 
-autoJoinerBtn.MouseButton1Click:Connect(function()
-    autoJoinerActive = not autoJoinerActive -- liga/desliga
+    btn.MouseButton1Click:Connect(function()
+        active = not active
 
-    if autoJoinerActive then
-        autoJoinerBtn.Text = "Parar Auto Joiner"
-        spawn(function()
-            while autoJoinerActive do
-                statusLabel.Text = "Procurando secreto/god"
-                statusLabel.TextSize = 12
-                local PlaceId = game.PlaceId
-                local servers = {}
-                
-                local success, req = pcall(function()
-                    return game:HttpGet("https://games.roblox.com/v1/games/"..PlaceId.."/servers/Public?sortOrder=Asc&limit=100")
-                end)
-                
-                if success then
-                    local data = HttpService:JSONDecode(req)
-                    for _,v in pairs(data.data) do  
-                        if v.id ~= game.JobId and v.playing < v.maxPlayers then
-                            table.insert(servers, v) -- servidores com vagas
+        if active then
+            btn.Text = "Parar "..searchName
+            spawn(function()
+                attemptCount = 0
+                while active do
+                    label.Text = "Procurando "..searchName
+                    label.TextSize = 12
+                    label.TextColor3 = Color3.fromRGB(0,255,0)
+                    local PlaceId = game.PlaceId
+                    local servers = {}
+                    
+                    local success, req = pcall(function()
+                        return game:HttpGet("https://games.roblox.com/v1/games/"..PlaceId.."/servers/Public?sortOrder=Asc&limit=100")
+                    end)
+                    
+                    if success then
+                        local data = HttpService:JSONDecode(req)
+                        for _,v in pairs(data.data) do  
+                            if v.id ~= game.JobId and v.playing < v.maxPlayers then
+                                table.insert(servers, v)
+                            end
+                        end  
+                    end
+
+                    table.sort(servers, function(a,b)
+                        return a.playing > b.playing
+                    end)
+
+                    if #servers > 0 then
+                        local largestServer = servers[1]
+                        label.Text = "Serve full"
+                        label.TextSize = 16
+                        wait(1)
+                        TeleportService:TeleportToPlaceInstance(PlaceId, largestServer.id, player)
+                    else
+                        attemptCount = attemptCount + 1
+                        if attemptCount >= maxAttempts then
+                            active = false
+                            btn.Text = searchName
+                            label.Text = "Nenhum "..searchName.." encontrado, aguarde alguns minutinhos..."
+                            label.TextSize = 12
+                            label.TextColor3 = Color3.fromRGB(0,255,0)
+
+                            delay(60, function()
+                                label.Text = searchName.." encontrado, clique no botão acima"
+                                label.TextSize = 12
+                                label.TextColor3 = Color3.fromRGB(0,255,0)
+                            end)
+                            break
+                        else
+                            label.Text = "Procurando "..searchName
+                            label.TextSize = 12
+                            wait(2)
                         end
-                    end  
+                    end
                 end
+            end)
+        else
+            btn.Text = searchName
+            label.Text = ""
+        end
+    end)
+end
 
-                -- Ordenar do mais cheio para o menos cheio
-                table.sort(servers, function(a,b)
-                    return a.playing > b.playing
-                end)
-
-                if #servers > 0 then
-                    local largestServer = servers[1]
-                    statusLabel.Text = "Serve full"
-                    statusLabel.TextSize = 16
-                    wait(1)
-                    TeleportService:TeleportToPlaceInstance(PlaceId, largestServer.id, player)
-                else
-                    statusLabel.Text = "Procurando secreto/god"
-                    statusLabel.TextSize = 12
-                    wait(2)
-                end
-            end
-        end)
-    else
-        -- Desligando Auto Joiner
-        autoJoinerBtn.Text = "Auto Joiner"
-        statusLabel.Text = ""
-    end
-end)
+-- Ativando as funções para cada botão (agora invertidos)
+startAutoJoin(autoJoinerGodBtn, statusLabel, "God")
+startAutoJoin(autoJoinerSecretBtn, statusLabel, "Secret")
+        
